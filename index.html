@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Yongho Seo | Geometry</title>
+  <meta name="description" content="Personal homepage of Yongho Seo, an integrated M.S./Ph.D. student in the Department of Mathematical Sciences at KAIST." />
+  <style>
+    :root {
+      --bg: #f6f3ee;
+      --paper: #fffdf9;
+      --text: #1f1b16;
+      --muted: #665f58;
+      --line: #ddd5ca;
+      --accent: #1d4ed8;
+      --accent-soft: #e8eefc;
+      --shadow: 0 10px 30px rgba(38, 27, 13, 0.06);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #f8f6f1 0%, #f6f3ee 100%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", Arial, sans-serif;
+      line-height: 1.72;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover { text-decoration: underline; }
+
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 20px 72px;
+    }
+
+    .hero {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      box-shadow: var(--shadow);
+      padding: 36px 34px;
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    h1, h2 {
+      font-family: Georgia, "Times New Roman", serif;
+      letter-spacing: -0.015em;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2.2rem, 4vw, 3.5rem);
+      line-height: 1.08;
+    }
+
+    .kr-name {
+      display: inline-block;
+      margin-left: 10px;
+      font-size: 0.55em;
+      color: var(--muted);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", Arial, sans-serif;
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 12px 0 0;
+      font-size: 1.08rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .lead {
+      margin: 18px 0 0;
+      max-width: 760px;
+      font-size: 1.02rem;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: #17367f;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .topnav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 8px 6px 24px;
+      margin-bottom: 6px;
+    }
+
+    .topnav a {
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.25fr 0.95fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 28px 26px;
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 1.65rem;
+    }
+
+    p { margin: 0 0 14px; }
+
+    ul {
+      margin: 0;
+      padding-left: 22px;
+    }
+
+    li + li { margin-top: 10px; }
+
+    .meta {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 10px 14px;
+      margin: 0;
+    }
+
+    .meta dt {
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .meta dd {
+      margin: 0;
+    }
+
+    .section-note {
+      color: var(--muted);
+      font-size: 0.96rem;
+      margin-top: 4px;
+    }
+
+    .timeline {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .timeline li {
+      padding: 16px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .timeline li:first-child { border-top: none; padding-top: 0; }
+
+    .item-title {
+      font-weight: 800;
+      font-size: 1.02rem;
+    }
+
+    .item-meta {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.97rem;
+    }
+
+    .footer {
+      padding-top: 10px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    @media (max-width: 820px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero {
+        padding: 28px 22px;
+      }
+
+      .card {
+        padding: 24px 20px;
+      }
+
+      .wrap {
+        padding: 20px 14px 56px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <p class="eyebrow">Personal Homepage</p>
+      <h1>Yongho Seo <span class="kr-name">서용호</span></h1>
+      <p class="subtitle">Integrated M.S./Ph.D. Student in Mathematical Sciences, KAIST</p>
+      <p class="lead">
+        I am an integrated M.S./Ph.D. student in the Department of Mathematical Sciences at KAIST,
+        advised by Prof. Suhyoung Choi. My research is in geometry, with interests centered on
+        geometric structures on manifolds and orbifolds, deformation spaces, and representations of
+        fundamental groups into Lie groups.
+      </p>
+      <div class="chips">
+        <a class="chip" href="mailto:seojm8@kaist.ac.kr">seojm8@kaist.ac.kr</a>
+        <a class="chip" href="https://mathsci.kaist.ac.kr/~manifold/" target="_blank" rel="noopener noreferrer">Geometric Structures Lab</a>
+        <a class="chip" href="https://mathsci.kaist.ac.kr/home/en/" target="_blank" rel="noopener noreferrer">KAIST Mathematical Sciences</a>
+      </div>
+    </header>
+
+    <nav class="topnav" aria-label="Section navigation">
+      <a href="#about">About</a>
+      <a href="#research">Research</a>
+      <a href="#publications">Publications</a>
+      <a href="#presentations">Presentations</a>
+      <a href="#contact">Contact</a>
+    </nav>
+
+    <div class="grid">
+      <section class="card" id="about">
+        <h2>About</h2>
+        <p>
+          I am currently pursuing the integrated M.S./Ph.D. program at KAIST. I work in the
+          Geometric Structures Lab under the supervision of Prof. Suhyoung Choi.
+        </p>
+        <p>
+          My current interests lie in low-dimensional geometry, especially geometric structures on
+          manifolds and orbifolds, deformation spaces, and Lie-group representations. In particular,
+          I am interested in real projective, affine, and flat Lorentz structures.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Affiliation</h2>
+        <dl class="meta">
+          <dt>Program</dt>
+          <dd>Integrated M.S./Ph.D. Program</dd>
+          <dt>Department</dt>
+          <dd>Department of Mathematical Sciences, KAIST</dd>
+          <dt>Advisor</dt>
+          <dd>Prof. Suhyoung Choi</dd>
+          <dt>Lab</dt>
+          <dd>Geometric Structures Lab</dd>
+          <dt>Email</dt>
+          <dd><a href="mailto:seojm8@kaist.ac.kr">seojm8@kaist.ac.kr</a></dd>
+        </dl>
+      </section>
+    </div>
+
+    <section class="card" id="research">
+      <h2>Research Interests</h2>
+      <p class="section-note">
+        My current research interests are shaped by the themes of the Geometric Structures Lab.
+      </p>
+      <ul>
+        <li>Geometric structures on low-dimensional manifolds and orbifolds</li>
+        <li>Deformation spaces of <em>(G, X)</em>-structures</li>
+        <li>Representations of surface and 2-orbifold fundamental groups into Lie groups</li>
+        <li>Real projective, affine, and flat Lorentz structures</li>
+      </ul>
+    </section>
+
+    <section class="card" id="publications">
+      <h2>Publications</h2>
+      <ul class="timeline">
+        <li>
+          <div class="item-title">Manuscript in preparation</div>
+          <div class="item-meta">Details will be added when available.</div>
+        </li>
+      </ul>
+    </section>
+
+    <section class="card" id="presentations">
+      <h2>Presentations &amp; Awards</h2>
+      <ul class="timeline">
+        <li>
+          <div class="item-title">Deforming deformation space of non-orderable Coxeter orbifold into higher dimension</div>
+          <div class="item-meta">
+            with Juseop Lee · Poster presentation · 2024 KMS Annual Meeting
+            (2024년도 대한수학회 정기총회 및 가을 연구발표회)
+          </div>
+          <p>
+            Prize-winning poster presentation at the meeting.
+          </p>
+        </li>
+      </ul>
+    </section>
+
+    <section class="card" id="contact">
+      <h2>Contact</h2>
+      <p><strong>Email</strong><br /><a href="mailto:seojm8@kaist.ac.kr">seojm8@kaist.ac.kr</a></p>
+      <p><strong>Affiliation</strong><br />Department of Mathematical Sciences, KAIST</p>
+      <p><strong>Location</strong><br />Daejeon, Republic of Korea</p>
+    </section>
+
+    <div class="footer">
+      Last updated: April 2026
+    </div>
+  </div>
+</body>
+</html>
