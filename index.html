@@ -204,6 +204,28 @@
       font-size: 0.97rem;
     }
 
+    .download-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    .download-link:hover {
+      text-decoration: none;
+      filter: brightness(0.96);
+    }
+
+    .download-link:focus-visible {
+      outline: 3px solid var(--accent-soft);
+      outline-offset: 3px;
+    }
+
     .footer {
       padding-top: 10px;
       text-align: center;
@@ -252,6 +274,7 @@
     <nav class="topnav" aria-label="Section navigation">
       <a href="#about">About</a>
       <a href="#research">Research</a>
+      <a href="#computations">Computational Data</a>
       <a href="#publications">Publications</a>
       <a href="#presentations">Presentations</a>
       <a href="#contact">Contact</a>
@@ -301,6 +324,29 @@
       </ul>
     </section>
 
+    <section class="card" id="computations">
+      <h2>Computational Data</h2>
+      <ul class="timeline">
+        <li>
+          <div class="item-title">Dimension computations for Coxeter truncation polytopes</div>
+          <div class="item-meta">
+            Supplementary computation files · Version 1 · ZIP archive · 39.2 MB · August 2026
+          </div>
+          <p>
+            This archive contains the computational files used for the dimension calculations of
+            deformation spaces associated with Coxeter truncation polytopes.
+          </p>
+          <a
+            class="download-link"
+            href="https://github.com/seojm8/seojm8.github.io/releases/download/truncation-dimension-v1/truncation-polytope-dimension-computations.zip"
+            aria-label="Download the dimension computation files for Coxeter truncation polytopes"
+          >
+            Download computation files <span aria-hidden="true">↓</span>
+          </a>
+        </li>
+      </ul>
+    </section>
+
     <section class="card" id="publications">
       <h2>Publications</h2>
       <ul class="timeline">
@@ -335,7 +381,7 @@
     </section>
 
     <div class="footer">
-      Last updated: April 2026
+      Last updated: August 2026
     </div>
   </div>
 </body>
