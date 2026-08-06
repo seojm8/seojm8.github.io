@@ -34,8 +34,11 @@ jobs:
           )
 
           latest="$(curl -fsSL "${headers[@]}" "${api}/pages/builds/latest" || true)"
-          status="$(jq -r '.status // empty' <<<"${latest:-{}}")"
-          commit="$(jq -r '.commit // empty' <<<"${latest:-{}}")"
+          if [[ -z "${latest}" ]]; then
+            latest='{}'
+          fi
+          status="$(jq -r '.status // empty' <<<"${latest}")"
+          commit="$(jq -r '.commit // empty' <<<"${latest}")"
 
           if [[ -n "${commit}" && ( "${status}" == "building" || "${status}" == "queued" ) ]]; then
             echo "Cancelling stale legacy Pages build for ${commit}"
@@ -53,6 +56,7 @@ jobs:
           cat /tmp/pages-update.json
 
           build_type="$(curl -fsSL "${headers[@]}" "${api}/pages" | jq -r '.build_type')"
+          echo "Pages build type is ${build_type}"
           test "${build_type}" = "workflow"
 
   deploy:
