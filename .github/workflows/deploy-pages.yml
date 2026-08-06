@@ -1,4 +1,4 @@
-name: Deploy static site to GitHub Pages
+name: Recover and rebuild GitHub Pages
 
 on:
   push:
@@ -9,37 +9,62 @@ on:
 permissions:
   contents: read
   pages: write
-  id-token: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  recover:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Prepare static site
+      - name: Cancel stale Pages deployment and request a fresh build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
         run: |
-          mkdir -p _site/assets
-          cp index.html _site/index.html
-          cp assets/profile-photo.jpg _site/assets/profile-photo.jpg
-          touch _site/.nojekyll
+          set -u
+          api="https://api.github.com/repos/${REPOSITORY}"
+          headers=(
+            -H "Accept: application/vnd.github+json"
+            -H "Authorization: Bearer ${GH_TOKEN}"
+            -H "X-GitHub-Api-Version: 2026-03-10"
+          )
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: _site
+          latest="$(curl -fsSL "${headers[@]}" "${api}/pages/builds/latest")"
+          status="$(jq -r '.status // empty' <<<"${latest}")"
+          commit="$(jq -r '.commit // empty' <<<"${latest}")"
+          echo "Latest Pages build: status=${status}, commit=${commit}"
 
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          if [[ -n "${commit}" && ( "${status}" == "building" || "${status}" == "queued" ) ]]; then
+            echo "Attempting to cancel stale Pages deployment ${commit}"
+            curl -sS -o /tmp/cancel-response -w '%{http_code}' \
+              -X POST "${headers[@]}" \
+              "${api}/pages/deployments/${commit}/cancel" | tee /tmp/cancel-code
+            echo
+            cat /tmp/cancel-response || true
+          fi
+
+          echo "Requesting a fresh Pages build from the latest default-branch revision"
+          curl -fsSL -X POST "${headers[@]}" "${api}/pages/builds"
+          echo
+
+          for attempt in $(seq 1 36); do
+            sleep 10
+            latest="$(curl -fsSL "${headers[@]}" "${api}/pages/builds/latest")"
+            status="$(jq -r '.status // empty' <<<"${latest}")"
+            commit="$(jq -r '.commit // empty' <<<"${latest}")"
+            error="$(jq -r '.error.message // empty' <<<"${latest}")"
+            echo "Check ${attempt}: status=${status}, commit=${commit}, error=${error}"
+
+            if [[ "${status}" == "built" ]]; then
+              exit 0
+            fi
+            if [[ "${status}" == "errored" ]]; then
+              exit 1
+            fi
+          done
+
+          echo "Pages build did not finish within six minutes."
+          exit 1
