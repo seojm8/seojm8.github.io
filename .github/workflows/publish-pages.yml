@@ -19,13 +19,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  publish:
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy-primary.outputs.page_url || steps.deploy-retry.outputs.page_url }}
+  clear-stale-builds:
     runs-on: ubuntu-latest
     steps:
-      - name: Cancel stale legacy Pages build
+      - name: Cancel stale Pages and obsolete workflow runs
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -61,6 +58,13 @@ jobs:
             done
           fi
 
+  deploy:
+    needs: clear-stale-builds
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy_primary.outputs.page_url || steps.deploy_retry.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -82,22 +86,22 @@ jobs:
           path: _site
 
       - name: Deploy to GitHub Pages
-        id: deploy-primary
+        id: deploy_primary
         continue-on-error: true
         uses: actions/deploy-pages@v4
 
       - name: Wait before deployment retry
-        if: steps.deploy-primary.outcome == 'failure'
+        if: steps.deploy_primary.outcome == 'failure'
         run: sleep 60
 
       - name: Retry direct deployment
-        id: deploy-retry
-        if: steps.deploy-primary.outcome == 'failure'
+        id: deploy_retry
+        if: steps.deploy_primary.outcome == 'failure'
         continue-on-error: true
         uses: actions/deploy-pages@v4
 
       - name: Fall back to branch-based Pages build
-        if: steps.deploy-primary.outcome == 'failure' && steps.deploy-retry.outcome == 'failure'
+        if: steps.deploy_primary.outcome == 'failure' && steps.deploy_retry.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
