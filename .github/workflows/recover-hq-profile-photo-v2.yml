@@ -1,0 +1,170 @@
+name: Recover full-resolution profile photo v2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .profile-hq-trigger-v2
+
+permissions:
+  contents: write
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect every staged copy of the full-resolution image
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_BLOB: 98de8a5ebed0c8ccd4c183f4ccecc80f098625eb
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          headers=(
+            -H "Accept: application/vnd.github+json"
+            -H "Authorization: Bearer ${GH_TOKEN}"
+            -H "X-GitHub-Api-Version: 2022-11-28"
+          )
+          : > /tmp/all-hq-sources.b64
+
+          fetch_blob_text() {
+            local sha="$1"
+            curl -fsSL "${headers[@]}" "${api}/git/blobs/${sha}" \
+              | jq -r '.content' \
+              | tr -d '\n' \
+              | base64 --decode >> /tmp/all-hq-sources.b64
+            printf '\n' >> /tmp/all-hq-sources.b64
+          }
+
+          fetch_blob_text "$SOURCE_BLOB"
+
+          tree_json="$(curl -fsSL "${headers[@]}" "${api}/git/trees/profile-photo-original-upload?recursive=1" || true)"
+          if jq -e '.tree' >/dev/null 2>&1 <<<"$tree_json"; then
+            while IFS= read -r sha; do
+              fetch_blob_text "$sha" || true
+            done < <(
+              jq -r '.tree[] | select(.type == "blob") | select(.path | startswith(".profile-upload/")) | select(.path | endswith(".b64")) | .sha' <<<"$tree_json"
+            )
+          fi
+
+          wc -c /tmp/all-hq-sources.b64
+
+      - name: Locate, decode, and verify a 489 by 623 high-quality WebP
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import re
+          from pathlib import Path
+
+          source = Path('/tmp/all-hq-sources.b64').read_text(encoding='utf-8', errors='ignore')
+          target_b64_length = 127796
+          target_byte_length = 95846
+          preferred = {
+              '7e13fd16df6cc081f7c4acaf2f6c79be87b68d923b920556e134d979b6a978d2',
+              'f595b33c5470b495f60cdf9b79b38832605478baf20119608978926c8a724591',
+          }
+
+          def dimensions(data: bytes):
+              if len(data) < 30 or data[:4] != b'RIFF' or data[8:12] != b'WEBP':
+                  return None
+              kind = data[12:16]
+              if kind == b'VP8 ' and data[23:26] == b'\x9d\x01\x2a':
+                  width = int.from_bytes(data[26:28], 'little') & 0x3fff
+                  height = int.from_bytes(data[28:30], 'little') & 0x3fff
+                  return width, height
+              if kind == b'VP8X' and len(data) >= 30:
+                  width = 1 + int.from_bytes(data[24:27], 'little')
+                  height = 1 + int.from_bytes(data[27:30], 'little')
+                  return width, height
+              return None
+
+          matches = []
+          for match in re.finditer('UklGR', source):
+              candidate = source[match.start():match.start() + target_b64_length]
+              if len(candidate) != target_b64_length:
+                  continue
+              try:
+                  data = base64.b64decode(candidate, validate=True)
+              except Exception:
+                  continue
+              if len(data) != target_byte_length:
+                  continue
+              dims = dimensions(data)
+              if dims != (489, 623):
+                  continue
+              digest = hashlib.sha256(data).hexdigest()
+              matches.append((digest, data))
+              if digest in preferred:
+                  break
+
+          if not matches:
+              raise SystemExit('No verified 489 by 623 high-quality WebP could be recovered.')
+
+          digest, data = next((item for item in matches if item[0] in preferred), matches[0])
+          Path('/tmp/profile-photo-hq.webp').write_bytes(data)
+          Path('/tmp/profile-photo-hq.sha256').write_text(digest + '\n', encoding='utf-8')
+          print(f'Recovered 489x623 WebP, {len(data)} bytes, SHA-256 {digest}')
+          PY
+          file /tmp/profile-photo-hq.webp
+          test "$(stat -c%s /tmp/profile-photo-hq.webp)" = "95846"
+
+      - name: Install the high-quality file and bypass the old browser cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          mkdir -p assets
+          cp /tmp/profile-photo-hq.webp assets/profile-photo-hq.webp
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('index.html')
+          html = path.read_text(encoding='utf-8')
+          html = re.sub(
+              r'assets/profile-photo(?:-hq)?\.(?:jpg|webp)(?:\?v=[^"\']+)?',
+              'assets/profile-photo-hq.webp?v=20260807-hq2',
+              html
+          )
+          html = html.replace('aspect-ratio: 280 / 357;', 'aspect-ratio: 489 / 623;')
+          html = re.sub(
+              r'width="280"\s*\n\s*height="357"',
+              'width="489"\n          height="623"',
+              html
+          )
+          if 'assets/profile-photo-hq.webp?v=20260807-hq2' not in html:
+              raise SystemExit('The high-quality photo URL was not installed.')
+          path.write_text(html, encoding='utf-8')
+          PY
+
+          digest="$(cat /tmp/profile-photo-hq.sha256)"
+          cat > PROFILE_PHOTO_HQ_INSTALLED.txt <<EOF
+          Full-resolution profile photo installed.
+          Dimensions: 489 x 623
+          Format: WebP quality 100
+          File size: 95846 bytes
+          SHA-256: ${digest}
+          EOF
+
+          rm -f assets/profile-photo.jpg
+          rm -rf .profile-upload
+          rm -f .profile-hq-trigger .profile-hq-trigger-v2
+          rm -f .github/workflows/recover-hq-profile-photo.yml
+          rm -f .github/workflows/recover-hq-profile-photo-v2.yml
+
+          git add -A
+          git commit -m "Install full-resolution profile photo"
+          git push origin main
