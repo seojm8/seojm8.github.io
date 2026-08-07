@@ -1,0 +1,79 @@
+name: Install original profile photo
+
+on:
+  push:
+    branches:
+      - profile-photo-original-upload
+    paths:
+      - .profile-upload/READY
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out upload branch
+        uses: actions/checkout@v6
+        with:
+          ref: profile-photo-original-upload
+          fetch-depth: 0
+
+      - name: Reconstruct and verify the exact source PNG
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .profile-upload/original-*.b64 | base64 --decode > /tmp/profile-photo-original.png
+          echo "7b06a6794aab6444cdb084bb9f30204471663d2041aa2c6b31db9c4b4b82fc8c  /tmp/profile-photo-original.png" | sha256sum --check --strict
+          python3 - <<'PY'
+          from PIL import Image
+          image = Image.open('/tmp/profile-photo-original.png')
+          assert image.size == (489, 623), image.size
+          assert image.format == 'PNG', image.format
+          print(f'Verified source image: {image.size[0]}x{image.size[1]} {image.format}')
+          PY
+
+      - name: Put the original PNG on main and update the page
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout -B main origin/main
+          mkdir -p assets
+          cp /tmp/profile-photo-original.png assets/profile-photo-original.png
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('index.html')
+          text = path.read_text(encoding='utf-8')
+          old = text
+          text = text.replace('aspect-ratio: 280 / 357;', 'aspect-ratio: 489 / 623;')
+          text = text.replace('src="assets/profile-photo.jpg"', 'src="assets/profile-photo-original.png?v=20260807-original"')
+          text = text.replace('width="280"', 'width="489"')
+          text = text.replace('height="357"', 'height="623"')
+          text = text.replace('decoding="async"', 'decoding="async"\n          fetchpriority="high"')
+          if text == old:
+              raise SystemExit('index.html was not changed; expected profile-photo markup was not found')
+          required = [
+              'assets/profile-photo-original.png?v=20260807-original',
+              'width="489"',
+              'height="623"',
+              'aspect-ratio: 489 / 623;',
+          ]
+          for item in required:
+              if item not in text:
+                  raise SystemExit(f'missing expected markup: {item}')
+          path.write_text(text, encoding='utf-8')
+          PY
+          rm -rf .profile-upload
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html assets/profile-photo-original.png .profile-upload
+          git commit -m "Use the original full-resolution profile photo"
+          git push origin main
+
+      - name: Remove temporary upload branch
+        if: success()
+        shell: bash
+        run: |
+          git push origin --delete profile-photo-original-upload || true
