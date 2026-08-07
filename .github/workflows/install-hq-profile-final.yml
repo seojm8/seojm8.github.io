@@ -1,0 +1,141 @@
+name: Install final high-quality profile photo
+
+on:
+  push:
+    branches:
+      - profile-hq-final
+    paths:
+      - .profile-hq-final-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: profile-hq-final
+          fetch-depth: 0
+
+      - name: Reconstruct high-quality 489x623 JPEG
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          headers=(
+            -H "Accept: application/vnd.github+json"
+            -H "Authorization: Bearer ${GH_TOKEN}"
+            -H "X-GitHub-Api-Version: 2022-11-28"
+          )
+          : > /tmp/profile.b64
+
+          append_blob_text() {
+            local sha="$1"
+            curl -fsSL "${headers[@]}" "${api}/git/blobs/${sha}" \
+              | jq -r '.content' \
+              | tr -d '\n' \
+              | base64 --decode >> /tmp/profile.b64
+          }
+
+          for sha in \
+            8737de9023732eb424e65dd4dc54014f7ba85512 \
+            0679fa67a87d372cc284c5e0a9bf4df7166ccf26 \
+            9b626e70b20b23c0243267571710912776283973 \
+            3e3d53e77873c3fcbd9ad2f7fdd62e194311830c \
+            403494028178092ffe61d2e64c92ff0217a8fcf1 \
+            13b412acd974aaa8d111f50eb214eae26d446570 \
+            a581661f12738c40c741c1d04a5cb6ff020afdaf \
+            db8e9813edafa2a59d7fa4ab38a5e59422523bf7 \
+            8514ffe5d233862fec479d2e509b2d35c6e3b38f \
+            36198e79c7bb6b599227e69caee7b52a756db0ff \
+            ad550255200574da45b6424ff1ed76d963d880ac \
+            500cc97d3ca1cccfec15e1d8e218afd022cb3f3b \
+            6c156147beac17aefbd2ec4b0c837d2a5ba81537 \
+            422638f12d7d7f5d1e3097c6ddc8ab36c679202e
+          do
+            append_blob_text "$sha"
+          done
+
+          for part in 14 15 16 17 18 19 20; do
+            test "$(wc -c < "assets/profile-hq-parts/${part}.txt")" -eq 3000
+            cat "assets/profile-hq-parts/${part}.txt" >> /tmp/profile.b64
+          done
+
+          append_blob_text fb80470a0f42547386625058255635ac262942c5
+          append_blob_text 527b50cf6be87d4fcf953545395869d97e93cb21
+
+          test "$(wc -c < /tmp/profile.b64)" -eq 66000
+          base64 --decode /tmp/profile.b64 > /tmp/profile-photo-hq.jpg
+          printf '\xff\xd9' >> /tmp/profile-photo-hq.jpg
+          test "$(stat -c%s /tmp/profile-photo-hq.jpg)" -eq 49502
+
+          python3 - <<'PY'
+          from pathlib import Path
+          data = Path('/tmp/profile-photo-hq.jpg').read_bytes()
+          if data[:2] != b'\xff\xd8' or data[-2:] != b'\xff\xd9':
+              raise SystemExit('Invalid JPEG boundaries')
+          i = 2
+          size = None
+          sof = {0xC0,0xC1,0xC2,0xC3,0xC5,0xC6,0xC7,0xC9,0xCA,0xCB,0xCD,0xCE,0xCF}
+          while i + 8 < len(data):
+              if data[i] != 0xFF:
+                  i += 1
+                  continue
+              while i < len(data) and data[i] == 0xFF:
+                  i += 1
+              if i >= len(data): break
+              marker = data[i]; i += 1
+              if marker in {0xD8,0xD9} or 0xD0 <= marker <= 0xD7:
+                  continue
+              if i + 2 > len(data): break
+              n = int.from_bytes(data[i:i+2], 'big')
+              if marker in sof and i + 7 <= len(data):
+                  h = int.from_bytes(data[i+3:i+5], 'big')
+                  w = int.from_bytes(data[i+5:i+7], 'big')
+                  size = (w,h)
+                  break
+              i += n
+          if size != (489,623):
+              raise SystemExit(f'Unexpected JPEG size {size}')
+          print('Verified JPEG dimensions:', size)
+          PY
+          file /tmp/profile-photo-hq.jpg
+
+      - name: Install on main and enlarge rendered portrait
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+
+          mkdir -p assets
+          cp /tmp/profile-photo-hq.jpg assets/profile-photo-hq.jpg
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('index.html')
+          html = p.read_text(encoding='utf-8')
+          html = re.sub(r'grid-template-columns: minmax\(0, 1fr\) \d+px;', 'grid-template-columns: minmax(0, 1fr) 300px;', html, count=1)
+          html = re.sub(r'aspect-ratio:\s*\d+\s*/\s*\d+;', 'aspect-ratio: 489 / 590;', html, count=1)
+          html = re.sub(r'src="assets/profile-photo[^\"]*"', 'src="assets/profile-photo-hq.jpg?v=20260807-final-hq"', html, count=1)
+          html = re.sub(r'width="\d+"\s*\n\s*height="\d+"', 'width="489"\n          height="623"', html, count=1)
+          html = html.replace('object-position: center 32%;', 'object-position: center top;')
+          html = html.replace('width: min(210px, 68vw);', 'width: min(260px, 76vw);')
+          if 'src="assets/profile-photo-hq.jpg?v=20260807-final-hq"' not in html:
+              raise SystemExit('Failed to update profile image URL')
+          if 'width="489"' not in html or 'height="623"' not in html:
+              raise SystemExit('Failed to set intrinsic dimensions')
+          p.write_text(html, encoding='utf-8')
+          PY
+
+          git add index.html assets/profile-photo-hq.jpg
+          git commit -m "Install high-quality 489x623 profile photo"
+          git push origin main
