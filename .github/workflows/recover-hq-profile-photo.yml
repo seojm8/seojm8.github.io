@@ -1,0 +1,123 @@
+name: Recover full-resolution profile photo
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .profile-hq-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Recover and verify the staged full-resolution image
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_BLOB: 98de8a5ebed0c8ccd4c183f4ccecc80f098625eb
+          SOURCE_LENGTH: "127796"
+          IMAGE_SIZE: "95846"
+          SHA_A: 7e13fd16df6cc081f7c4acaf2f6c79be87b68d923b920556e134d979b6a978d2
+          SHA_B: f595b33c5470b495f60cdf9b79b38832605478baf20119608978926c8a724591
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/git/blobs/${SOURCE_BLOB}"
+          curl -fsSL \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${api}" \
+            | jq -r '.content' \
+            | tr -d '\n' \
+            | base64 --decode > /tmp/hq-source.b64
+
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import os
+          import re
+          from pathlib import Path
+
+          source = Path('/tmp/hq-source.b64').read_text(encoding='utf-8')
+          length = int(os.environ['SOURCE_LENGTH'])
+          image_size = int(os.environ['IMAGE_SIZE'])
+          allowed = {os.environ['SHA_A'], os.environ['SHA_B']}
+          starts = [m.start() for m in re.finditer('UklGR', source)]
+          print(f'Candidate starts: {len(starts)}')
+
+          for start in starts:
+              candidate = source[start:start + length]
+              if len(candidate) != length:
+                  continue
+              try:
+                  data = base64.b64decode(candidate, validate=True)
+              except Exception:
+                  continue
+              digest = hashlib.sha256(data).hexdigest()
+              if (
+                  len(data) == image_size
+                  and data[:4] == b'RIFF'
+                  and data[8:12] == b'WEBP'
+                  and digest in allowed
+              ):
+                  Path('/tmp/profile-photo-hq.webp').write_bytes(data)
+                  print(f'Recovered verified image: {digest}')
+                  break
+          else:
+              raise SystemExit('Verified full-resolution image was not found in the staged blob.')
+          PY
+
+          file /tmp/profile-photo-hq.webp
+          test "$(stat -c%s /tmp/profile-photo-hq.webp)" = "$IMAGE_SIZE"
+
+      - name: Replace the compressed thumbnail
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          mkdir -p assets
+          cp /tmp/profile-photo-hq.webp assets/profile-photo-hq.webp
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('index.html')
+          html = path.read_text(encoding='utf-8')
+          html = html.replace(
+              'assets/profile-photo.jpg',
+              'assets/profile-photo-hq.webp?v=20260807-hq'
+          )
+          html = html.replace(
+              'aspect-ratio: 280 / 357;',
+              'aspect-ratio: 489 / 623;'
+          )
+          html = re.sub(
+              r'width="280"\s*\n\s*height="357"',
+              'width="489"\n          height="623"',
+              html
+          )
+          if 'assets/profile-photo-hq.webp?v=20260807-hq' not in html:
+              raise SystemExit('Profile photo reference was not updated.')
+          path.write_text(html, encoding='utf-8')
+          PY
+
+          rm -f assets/profile-photo.jpg
+          rm -rf .profile-upload
+          rm -f .profile-hq-trigger
+          rm -f .github/workflows/recover-hq-profile-photo.yml
+
+          git add -A
+          git commit -m "Replace compressed profile thumbnail with full-resolution image"
+          git push origin main
